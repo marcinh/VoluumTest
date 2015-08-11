@@ -1,22 +1,24 @@
 package com.voluum.framework;
 
+import com.google.gson.Gson;
 import com.mashape.unirest.http.HttpMethod;
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.JsonNode;
 import com.mashape.unirest.http.Unirest;
 import com.mashape.unirest.http.exceptions.UnirestException;
 import com.mashape.unirest.request.HttpRequestWithBody;
-import org.apache.http.client.HttpClient;
 
 
 public abstract class RestBase{
     protected String securityToken;
+    protected Gson gson;
 
     protected RestBase(String token){
         securityToken = token;
+        gson = new Gson();
     }
 
-    protected HttpResponse<JsonNode> execute(HttpMethod method, String url, final Action<HttpRequestWithBody> action) throws UnirestException
+    protected HttpResponse<JsonNode> execute(HttpMethod method, String url, IAction<HttpRequestWithBody> action) throws UnirestException
     {
         HttpRequestWithBody request = new HttpRequestWithBody(method, url);
 
@@ -31,16 +33,15 @@ public abstract class RestBase{
         return execute(method, url, null);
     }
 
-    protected HttpResponse<JsonNode> executeSecurely(HttpMethod method, String url, final Action<HttpRequestWithBody> action) throws UnirestException
+    protected HttpResponse<JsonNode> executeSecurely(HttpMethod method, String url, IAction<HttpRequestWithBody> action) throws UnirestException
     {
-        return execute(method, url, new Action<HttpRequestWithBody>() {
-            @Override
-            public void execute(HttpRequestWithBody request) {
-                request.header("cwauth-token", securityToken);
+        return execute(method, url, (request) ->
+        {
+            request.header("cwauth-token", securityToken);
 
-                if (action != null)
-                    action.execute(request);
-            }
+            if (action != null)
+                action.execute(request);
+
         });
     }
 
@@ -50,7 +51,7 @@ public abstract class RestBase{
     }
 
     public HttpResponse<String> get(String url, boolean enableRedirect) throws UnirestException {
-        Unirest.enableRedirect(enableRedirect);
+        //Unirest.enableRedirect(enableRedirect);
         return Unirest.get(url).asString();
     }
 }

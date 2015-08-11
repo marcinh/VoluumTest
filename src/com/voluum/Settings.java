@@ -12,6 +12,7 @@ public class Settings {
     public static String securityUrl;
     public static String coreUrl;
     public static String reportsUrl;
+    public static String redirectUrl;
 
     static {
         try {
