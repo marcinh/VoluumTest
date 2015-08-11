@@ -1,5 +1,8 @@
 package com.voluum.framework.serialization;
 
+/**
+ * Object for JSON deserializtion
+ */
 public class CampaignReportObject
 {
     private int clicks;

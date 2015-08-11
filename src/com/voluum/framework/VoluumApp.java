@@ -3,13 +3,13 @@ package com.voluum.framework;
 import com.mashape.unirest.http.HttpMethod;
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.JsonNode;
-import com.mashape.unirest.http.Unirest;
 import com.mashape.unirest.http.exceptions.UnirestException;
 import com.voluum.Settings;
 import com.voluum.framework.exceptions.GetRequestException;
 import com.voluum.framework.exceptions.LoginFailureException;
 import com.voluum.framework.serialization.CampaignObject;
 import com.voluum.framework.serialization.CampaignReportObject;
+import com.voluum.framework.serialization.LoginObject;
 import org.json.JSONArray;
 
 import java.net.HttpURLConnection;
@@ -18,13 +18,22 @@ import java.text.SimpleDateFormat;
 import java.util.Base64;
 import java.util.Calendar;
 
-
+/**
+ * Class containing logical functions built with basic rest functions from parent class
+ */
 public class VoluumApp extends RestBase implements AutoCloseable {
 
     public VoluumApp() {
         super("");
     }
 
+    /**
+     * Login method using REST api
+     * @param user Username to log in
+     * @param password User password to log in
+     * @throws UnirestException
+     * @throws LoginFailureException
+     */
     public void login(String user, String password) throws UnirestException, LoginFailureException {
         final String credentials = new String(Base64.getEncoder().encode(String.format("%s:%s", user, password).getBytes()));
 
@@ -34,18 +43,30 @@ public class VoluumApp extends RestBase implements AutoCloseable {
             request.header("accept", "application/json");
         });
 
-        boolean loggedIn = response.getBody().getObject().getBoolean("loggedIn");
+        LoginObject lObject = gson.fromJson(response.getBody().toString(), LoginObject.class);
+
+        boolean loggedIn = lObject.loggedIn;
 
         if (!loggedIn)
-            throw new LoginFailureException();
+            throw new LoginFailureException(lObject.typeName);
 
-        securityToken = response.getBody().getObject().getString("token");
+        securityToken = lObject.token;
     }
 
+    /**
+     * Login method using REST api with credentials from project settings
+     * @throws UnirestException
+     * @throws LoginFailureException
+     */
     public void login() throws UnirestException, LoginFailureException {
         login(Settings.user, Settings.password);
     }
 
+    /**
+     * Logout method using REST api
+     * @throws UnirestException
+     * @throws GetRequestException
+     */
     public void logout() throws UnirestException, GetRequestException {
         HttpResponse<JsonNode> response = executeSecurely(HttpMethod.GET, Settings.securityUrl + "/session/logout");
 
@@ -53,6 +74,13 @@ public class VoluumApp extends RestBase implements AutoCloseable {
             throw new GetRequestException("logout");
     }
 
+    /**
+     * Method used to create new campaign based on argument passed
+     * @param campaign Object describing campaign details
+     * @return HttpResponse with JSON content
+     * @throws UnirestException
+     * @throws GetRequestException
+     */
     public HttpResponse<JsonNode> createCampaign(CampaignObject campaign) throws UnirestException, GetRequestException {
 
         return executeSecurely(HttpMethod.POST, Settings.coreUrl + "/campaigns", request ->
@@ -62,6 +90,12 @@ public class VoluumApp extends RestBase implements AutoCloseable {
        });
     }
 
+    /**
+     * Method getting campaign statistics from reports page based on campaign id provided
+     * @param id Unique campaign id
+     * @return CampaignReportObject with campaign statistics
+     * @throws UnirestException
+     */
     public CampaignReportObject getCampaignStatistics(String id) throws UnirestException
     {
         DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
@@ -81,6 +115,12 @@ public class VoluumApp extends RestBase implements AutoCloseable {
         return gson.fromJson(array.getJSONObject(0).toString(), CampaignReportObject.class);
     }
 
+    /**
+     * Method getting campaign details based on campaign id provided
+     * @param id Unique campaign id
+     * @return HttpResponse with JSON content
+     * @throws UnirestException
+     */
     public HttpResponse<JsonNode> getCampaighDetails(String id) throws UnirestException
     {
         return executeSecurely(HttpMethod.GET, Settings.coreUrl + "/campaigns/{id}",request ->
@@ -90,7 +130,6 @@ public class VoluumApp extends RestBase implements AutoCloseable {
     @Override
     public void close() throws Exception {
         logout();
-        Unirest.shutdown();
     }
 
     public static VoluumApp loggedIn() throws LoginFailureException, UnirestException {

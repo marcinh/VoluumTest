@@ -5,6 +5,9 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.Properties;
 
+/**
+ * Static class handling project parameters
+ */
 public class Settings {
 
     public static String user;

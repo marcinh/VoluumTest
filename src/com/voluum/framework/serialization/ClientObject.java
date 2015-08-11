@@ -1,5 +1,8 @@
 package com.voluum.framework.serialization;
 
+/**
+ * Mock object for JSON serializtion
+ */
 public class ClientObject {
     public String id;
     public String updatedTime;

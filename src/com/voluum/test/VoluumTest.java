@@ -2,32 +2,30 @@ package com.voluum.test;
 
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.JsonNode;
-import com.sun.jndi.toolkit.url.Uri;
 import com.voluum.Settings;
+import com.voluum.framework.Uri;
 import com.voluum.framework.VoluumApp;
+import com.voluum.framework.serialization.CampaignObject;
+import com.voluum.framework.serialization.TrafficClassObject;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
-import java.net.URI;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class VoluumTest {
 
     //Example campaigh name
-    String CAPMPAIGNNAME = "TEST108";
+    String CAPMPAIGNNAME = "TEST114";
     //Example campaign ID for test purposes
-    String CAMPAIGNID = "806f4cf7-3168-4866-a212-837ecce37fef";
-    String PATTERN = "/?subid=[A-Za-z0-9]{24}";
+    String CAMPAIGNID = "6601c945-2601-4e23-8a79-d7e35f859f43";
+    String PATTERN = "subid=[A-Za-z0-9]{24}";
 
-    private Uri redirectUri;
+    private String redirectUri;
 
     @Before
-    public void Setup() throws MalformedURLException {
-        redirectUri = new Uri(Settings.redirectUrl);
+    public void Setup() throws Exception {
+        redirectUri = Settings.redirectUrl;
     }
 
     @Test
@@ -35,21 +33,19 @@ public class VoluumTest {
     {
         try(VoluumApp vApp = VoluumApp.loggedIn())
         {
-//            HttpResponse<JsonNode> response = vApp.createCampaign(new CampaignObject(CAPMPAIGNNAME, redirectUri.toString(), TrafficClassObject.getZeroPark()));
-//
-//            Assert.assertEquals(response.getStatus(), HttpURLConnection.HTTP_CREATED);
-//
-//            String linkResponse = response.getBody().getObject().getString("url");
-            String linkResponse = "http://auayi.voluumtrk.com/voluum/6601c945-2601-4e23-8a79-d7e35f859f43";
+            HttpResponse<JsonNode> response = vApp.createCampaign(new CampaignObject(CAPMPAIGNNAME, redirectUri, TrafficClassObject.getZeroPark()));
 
-            HttpResponse<String> getResponse = vApp.get(linkResponse, false);
+            Assert.assertEquals(HttpURLConnection.HTTP_CREATED, response.getStatus() );
 
-            Assert.assertEquals(getResponse.getStatus(), HttpURLConnection.HTTP_MOVED_TEMP);
-            Uri currentUri = new Uri(getResponse.getHeaders().getFirst("location"));
+            Uri responseUri = Uri.fromResponseUrl(response);
 
-//            System.out.println(currentUri);
+            HttpResponse<String> getResponse = vApp.get(responseUri.getUrl(), false);
 
-            Assert.assertFalse(currentUri.getQuery().matches(PATTERN)); //Not perfect - implement custom matcher
+            Assert.assertEquals(HttpURLConnection.HTTP_MOVED_TEMP, getResponse.getStatus());
+
+            Uri currentUri = Uri.fromResponseLocation(getResponse);
+
+            Assert.assertTrue(currentUri.getQuery().matches(PATTERN)); //Not perfect - implement custom matcher
         }
     }
 
@@ -88,61 +84,31 @@ public class VoluumTest {
     {
         try(VoluumApp vApp = VoluumApp.loggedIn())
         {
-//            int conversionsNumber  = vApp.getCampaignStatistics(CAMPAIGNID).getConversions();
-//
-//            HttpResponse<JsonNode> response = vApp.getCampaighDetails(CAMPAIGNID);
-//
-//            String url = response.getBody().getObject().getString("url");
-//
-//            HttpResponse<String> getResponse = vApp.get(url, false);
-//
-//            String redirection = getResponse.getHeaders().getFirst("location");
+            int conversionsNumber  = vApp.getCampaignStatistics(CAMPAIGNID).getConversions();
 
-            String redirection = "http://example.com?subid=w02S4BIFT82BBEAMGM0PLF3E";
+            HttpResponse<JsonNode> response = vApp.getCampaighDetails(CAMPAIGNID);
 
-            URI uri = new URI(redirection);
+            Uri uri = Uri.fromResponseUrl(response);
 
-            Matcher matcher = Pattern.compile(PATTERN).matcher(uri.getQuery());
+            HttpResponse<String> getResponse = vApp.get(uri.getUrl(), false);
 
-            if(!matcher.find()){
-                Assert.fail("subid not found in request");
+            uri.setQuery("/postback?cid=" + Uri.fromResponseLocation(getResponse).getSubid());
+
+            vApp.get(uri.getUrl(), true);
+
+            boolean conversionsIncremented = false;
+
+            for (int i = 0; i < 15; i++) {
+                Thread.sleep(2000);
+
+                if ( vApp.getCampaignStatistics(CAMPAIGNID).getConversions() == conversionsNumber + 1)
+                {
+                    conversionsIncremented = true;
+                    break;
+                }
             }
-            String cId = uri.getQuery().replace("subid=", "");
 
-
-            System.out.println(String.format("%s/postback?cid=%s", uri.getHost(), cId));
-
-
-            System.out.println(uri.getHost());
-            System.out.println(uri.getQuery());
-            System.out.println(uri.getPath());
-            System.out.println(uri.getHost());
-
-
-            vApp.get(String.format("%s/postback?cid=%s", redirection.replace(uri.getQuery(), ""), cId), true);
-
-
-//            for(String key : response.getHeaders().keySet()){
-//                System.out.println(key);
-//                System.out.println(response.getHeaders().getFirst(key));
-//            }
-
-
-
-//            boolean visitIncremented = false;
-//
-//            for (int i = 0; i < 10; i++)
-//            {
-//                Thread.sleep(1000);
-//
-//                if ( vApp.getCampaignStatistics(CAMPAIGNID).getVisits() == conversionsNumber  + 1)
-//                {
-//                    visitIncremented = true;
-//                    break;
-//                }
-//            }
-//
-//            Assert.assertTrue(visitIncremented);
+            Assert.assertTrue(conversionsIncremented);
         }
     }
 }
